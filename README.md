@@ -15,7 +15,7 @@ The following snippet loads a file from the current directory (```./input.stl```
 in the current directory called ```./output.png```.
 
 ```javascript
-const StlThumbnailer = require('node-stl-to-thumbnail');
+const StlThumbnailer = require('stl-thumbnailer-node');
 const fs = require('fs');
 
 const thumbnailer = new StlThumbnailer({
