@@ -2,1153 +2,1104 @@
  * @author mrdoob / http://mrdoob.com/
  */
 
-THREE.SpriteCanvasMaterial = function ( parameters ) {
+THREE.SpriteCanvasMaterial = function (parameters) {
 
-	THREE.Material.call( this );
+  THREE.Material.call(this);
 
-	this.type = 'SpriteCanvasMaterial';
+  this.type = 'SpriteCanvasMaterial';
 
-	this.color = new THREE.Color( 0xffffff );
-	this.program = function ( context, color ) {};
+  this.color = new THREE.Color(0xffffff);
+  this.program = function () {};
 
-	this.setValues( parameters );
+  this.setValues(parameters);
 
 };
 
-THREE.SpriteCanvasMaterial.prototype = Object.create( THREE.Material.prototype );
+THREE.SpriteCanvasMaterial.prototype = Object.create(THREE.Material.prototype);
 THREE.SpriteCanvasMaterial.prototype.constructor = THREE.SpriteCanvasMaterial;
 
 THREE.SpriteCanvasMaterial.prototype.clone = function () {
 
-	var material = new THREE.SpriteCanvasMaterial();
+  let material = new THREE.SpriteCanvasMaterial();
 
-	material.copy( this );
-	material.color.copy( this.color );
-	material.program = this.program;
+  material.copy(this);
+  material.color.copy(this.color);
+  material.program = this.program;
 
-	return material;
+  return material;
 
 };
 
 //
 
-THREE.CanvasRenderer = function ( parameters ) {
+THREE.CanvasRenderer = function (parameters) {
 
-	parameters = parameters || {};
+  parameters = parameters || {};
 
-	var _this = this,
-	_renderData, _elements, _lights,
-	_projector = new THREE.Projector(),
+  new THREE.Color();
+  new THREE.Color();
+  new THREE.Color();
+  new THREE.Color();
+  new THREE.RenderableVertex();
+  let _this = this,
+    _renderData, _elements, _lights,
+    _projector = new THREE.Projector(),
 
-	_canvas = parameters.canvas !== undefined
-			 ? parameters.canvas
-			 : document.createElement( 'canvas' ),
+    _canvas = parameters.canvas !== undefined
+      ? parameters.canvas
+      : document.createElement('canvas'),
 
-	_canvasWidth = _canvas.width,
-	_canvasHeight = _canvas.height,
-	_canvasWidthHalf = Math.floor( _canvasWidth / 2 ),
-	_canvasHeightHalf = Math.floor( _canvasHeight / 2 ),
+    _canvasWidth = _canvas.width,
+    _canvasHeight = _canvas.height,
+    _canvasWidthHalf = Math.floor(_canvasWidth / 2),
+    _canvasHeightHalf = Math.floor(_canvasHeight / 2),
 
-	_viewportX = 0,
-	_viewportY = 0,
-	_viewportWidth = _canvasWidth,
-	_viewportHeight = _canvasHeight,
+    _viewportX = 0,
+    _viewportY = 0,
+    _viewportWidth = _canvasWidth,
+    _viewportHeight = _canvasHeight,
 
-	_pixelRatio = 1,
+    _pixelRatio = 1,
 
-	_context = _canvas.getContext( '2d', {
-		alpha: parameters.alpha === true
-	} ),
+    _context = _canvas.getContext('2d', {
+      alpha: parameters.alpha === true,
+    }),
 
-	_clearColor = new THREE.Color( 0x000000 ),
-	_clearAlpha = parameters.alpha === true ? 0 : 1,
+    _clearColor = new THREE.Color(0x000000),
+    _clearAlpha = parameters.alpha === true ? 0 : 1,
 
-	_contextGlobalAlpha = 1,
-	_contextGlobalCompositeOperation = 0,
-	_contextStrokeStyle = null,
-	_contextFillStyle = null,
-	_contextLineWidth = null,
-	_contextLineCap = null,
-	_contextLineJoin = null,
-	_contextLineDash = [],
+    _contextGlobalAlpha = 1,
+    _contextGlobalCompositeOperation = 0,
+    _contextStrokeStyle = null,
+    _contextFillStyle = null,
+    _contextLineWidth = null,
+    _contextLineCap = null,
+    _contextLineJoin = null,
+    _contextLineDash = [],
 
-	_camera,
+    _camera,
 
-	_v1, _v2, _v3, _v4,
-	_v5 = new THREE.RenderableVertex(),
-	_v6 = new THREE.RenderableVertex(),
+    _v1, _v2, _v3 = new THREE.RenderableVertex(),
+    _v1x, _v1y, _v2x, _v2y, _v3x, _v3y,
+    _color = new THREE.Color(),
+    _diffuseColor = new THREE.Color(),
+    _emissiveColor = new THREE.Color(),
 
-	_v1x, _v1y, _v2x, _v2y, _v3x, _v3y,
-	_v4x, _v4y, _v5x, _v5y, _v6x, _v6y,
+    _lightColor = new THREE.Color(),
 
-	_color = new THREE.Color(),
-	_color1 = new THREE.Color(),
-	_color2 = new THREE.Color(),
-	_color3 = new THREE.Color(),
-	_color4 = new THREE.Color(),
+    _patterns = {},
 
-	_diffuseColor = new THREE.Color(),
-	_emissiveColor = new THREE.Color(),
+    _uvs,
+    _uv1x, _uv1y, _uv2x, _uv2y, _uv3x, _uv3y,
 
-	_lightColor = new THREE.Color(),
+    _clipBox = new THREE.Box2(),
+    _clearBox = new THREE.Box2(),
+    _elemBox = new THREE.Box2(),
 
-	_patterns = {},
+    _ambientLight = new THREE.Color(),
+    _directionalLights = new THREE.Color(),
+    _pointLights = new THREE.Color(),
 
-	_image, _uvs,
-	_uv1x, _uv1y, _uv2x, _uv2y, _uv3x, _uv3y,
+    _vector3 = new THREE.Vector3(), // Needed for PointLight
+    _centroid = new THREE.Vector3(),
+    _normal = new THREE.Vector3(),
+    _normalViewMatrix = new THREE.Matrix3();
 
-	_clipBox = new THREE.Box2(),
-	_clearBox = new THREE.Box2(),
-	_elemBox = new THREE.Box2(),
+  // dash+gap fallbacks for Firefox and everything else
 
-	_ambientLight = new THREE.Color(),
-	_directionalLights = new THREE.Color(),
-	_pointLights = new THREE.Color(),
+  if (_context.setLineDash === undefined) {
 
-	_vector3 = new THREE.Vector3(), // Needed for PointLight
-	_centroid = new THREE.Vector3(),
-	_normal = new THREE.Vector3(),
-	_normalViewMatrix = new THREE.Matrix3();
+    _context.setLineDash = function () {};
 
-	/* TODO
-	_canvas.mozImageSmoothingEnabled = false;
-	_canvas.webkitImageSmoothingEnabled = false;
-	_canvas.msImageSmoothingEnabled = false;
-	_canvas.imageSmoothingEnabled = false;
-	*/
+  }
 
-	// dash+gap fallbacks for Firefox and everything else
+  this.domElement = _canvas;
 
-	if ( _context.setLineDash === undefined ) {
+  this.autoClear = true;
+  this.sortObjects = true;
+  this.sortElements = true;
 
-		_context.setLineDash = function () {};
+  this.info = {
 
-	}
+    render: {
 
-	this.domElement = _canvas;
+      vertices: 0,
+      faces: 0,
 
-	this.autoClear = true;
-	this.sortObjects = true;
-	this.sortElements = true;
+    },
 
-	this.info = {
+  };
 
-		render: {
+  // WebGLRenderer compatibility
 
-			vertices: 0,
-			faces: 0
+  this.supportsVertexTextures = function () {};
+  this.setFaceCulling = function () {};
 
-		}
+  // API
 
-	};
+  this.getContext = function () {
 
-	// WebGLRenderer compatibility
+    return _context;
 
-	this.supportsVertexTextures = function () {};
-	this.setFaceCulling = function () {};
+  };
 
-	// API
+  this.getContextAttributes = function () {
 
-	this.getContext = function () {
+    return _context.getContextAttributes();
 
-		return _context;
+  };
 
-	};
+  this.getPixelRatio = function () {
 
-	this.getContextAttributes = function () {
+    return _pixelRatio;
 
-		return _context.getContextAttributes();
+  };
 
-	};
+  this.setPixelRatio = function (value) {
 
-	this.getPixelRatio = function () {
+    if (value !== undefined) _pixelRatio = value;
 
-		return _pixelRatio;
+  };
 
-	};
+  this.setSize = function (width, height, updateStyle) {
 
-	this.setPixelRatio = function ( value ) {
+    _canvasWidth = width * _pixelRatio;
+    _canvasHeight = height * _pixelRatio;
 
-		if ( value !== undefined ) _pixelRatio = value;
+    _canvas.width = _canvasWidth;
+    _canvas.height = _canvasHeight;
 
-	};
+    _canvasWidthHalf = Math.floor(_canvasWidth / 2);
+    _canvasHeightHalf = Math.floor(_canvasHeight / 2);
 
-	this.setSize = function ( width, height, updateStyle ) {
+    if (updateStyle !== false) {
 
-		_canvasWidth = width * _pixelRatio;
-		_canvasHeight = height * _pixelRatio;
+      _canvas.style.width = width + 'px';
+      _canvas.style.height = height + 'px';
 
-		_canvas.width = _canvasWidth;
-		_canvas.height = _canvasHeight;
+    }
 
-		_canvasWidthHalf = Math.floor( _canvasWidth / 2 );
-		_canvasHeightHalf = Math.floor( _canvasHeight / 2 );
+    _clipBox.min.set(-_canvasWidthHalf, -_canvasHeightHalf);
+    _clipBox.max.set(_canvasWidthHalf, _canvasHeightHalf);
 
-		if ( updateStyle !== false ) {
+    _clearBox.min.set(-_canvasWidthHalf, -_canvasHeightHalf);
+    _clearBox.max.set(_canvasWidthHalf, _canvasHeightHalf);
 
-			_canvas.style.width = width + 'px';
-			_canvas.style.height = height + 'px';
+    _contextGlobalAlpha = 1;
+    _contextGlobalCompositeOperation = 0;
+    _contextStrokeStyle = null;
+    _contextFillStyle = null;
+    _contextLineWidth = null;
+    _contextLineCap = null;
+    _contextLineJoin = null;
 
-		}
+    this.setViewport(0, 0, width, height);
 
-		_clipBox.min.set( - _canvasWidthHalf, - _canvasHeightHalf );
-		_clipBox.max.set(   _canvasWidthHalf,   _canvasHeightHalf );
+  };
 
-		_clearBox.min.set( - _canvasWidthHalf, - _canvasHeightHalf );
-		_clearBox.max.set(   _canvasWidthHalf,   _canvasHeightHalf );
+  this.setViewport = function (x, y, width, height) {
 
-		_contextGlobalAlpha = 1;
-		_contextGlobalCompositeOperation = 0;
-		_contextStrokeStyle = null;
-		_contextFillStyle = null;
-		_contextLineWidth = null;
-		_contextLineCap = null;
-		_contextLineJoin = null;
+    _viewportX = x * _pixelRatio;
+    _viewportY = y * _pixelRatio;
 
-		this.setViewport( 0, 0, width, height );
+    _viewportWidth = width * _pixelRatio;
+    _viewportHeight = height * _pixelRatio;
 
-	};
+  };
 
-	this.setViewport = function ( x, y, width, height ) {
+  this.setScissor = function () {};
+  this.setScissorTest = function () {};
 
-		_viewportX = x * _pixelRatio;
-		_viewportY = y * _pixelRatio;
+  this.setClearColor = function (color, alpha) {
 
-		_viewportWidth = width * _pixelRatio;
-		_viewportHeight = height * _pixelRatio;
+    _clearColor.set(color);
+    _clearAlpha = alpha !== undefined ? alpha : 1;
 
-	};
+    _clearBox.min.set(-_canvasWidthHalf, -_canvasHeightHalf);
+    _clearBox.max.set(_canvasWidthHalf, _canvasHeightHalf);
 
-	this.setScissor = function () {};
-	this.setScissorTest = function () {};
+  };
 
-	this.setClearColor = function ( color, alpha ) {
+  this.setClearColorHex = function (hex, alpha) {
 
-		_clearColor.set( color );
-		_clearAlpha = alpha !== undefined ? alpha : 1;
+    console.warn('THREE.CanvasRenderer: .setClearColorHex() is being removed. Use .setClearColor() instead.');
+    this.setClearColor(hex, alpha);
 
-		_clearBox.min.set( - _canvasWidthHalf, - _canvasHeightHalf );
-		_clearBox.max.set(   _canvasWidthHalf,   _canvasHeightHalf );
+  };
 
-	};
+  this.getClearColor = function () {
 
-	this.setClearColorHex = function ( hex, alpha ) {
+    return _clearColor;
 
-		console.warn( 'THREE.CanvasRenderer: .setClearColorHex() is being removed. Use .setClearColor() instead.' );
-		this.setClearColor( hex, alpha );
+  };
 
-	};
+  this.getClearAlpha = function () {
 
-	this.getClearColor = function () {
+    return _clearAlpha;
 
-		return _clearColor;
+  };
 
-	};
+  this.getMaxAnisotropy = function () {
 
-	this.getClearAlpha = function () {
+    return 0;
 
-		return _clearAlpha;
+  };
 
-	};
+  this.clear = function () {
 
-	this.getMaxAnisotropy = function () {
+    if (_clearBox.isEmpty() === false) {
 
-		return 0;
+      _clearBox.intersect(_clipBox);
+      _clearBox.expandByScalar(2);
 
-	};
+      _clearBox.min.x = _clearBox.min.x + _canvasWidthHalf;
+      _clearBox.min.y = -_clearBox.min.y + _canvasHeightHalf;		// higher y value !
+      _clearBox.max.x = _clearBox.max.x + _canvasWidthHalf;
+      _clearBox.max.y = -_clearBox.max.y + _canvasHeightHalf;		// lower y value !
 
-	this.clear = function () {
+      if (_clearAlpha < 1) {
 
-		if ( _clearBox.isEmpty() === false ) {
+        _context.clearRect(
+          _clearBox.min.x | 0,
+          _clearBox.max.y | 0,
+          (_clearBox.max.x - _clearBox.min.x) | 0,
+          (_clearBox.min.y - _clearBox.max.y) | 0,
+        );
 
-			_clearBox.intersect( _clipBox );
-			_clearBox.expandByScalar( 2 );
+      }
 
-			_clearBox.min.x = _clearBox.min.x + _canvasWidthHalf;
-			_clearBox.min.y =  - _clearBox.min.y + _canvasHeightHalf;		// higher y value !
-			_clearBox.max.x = _clearBox.max.x + _canvasWidthHalf;
-			_clearBox.max.y =  - _clearBox.max.y + _canvasHeightHalf;		// lower y value !
+      if (_clearAlpha > 0) {
 
-			if ( _clearAlpha < 1 ) {
+        setBlending(THREE.NormalBlending);
+        setOpacity(1);
 
-				_context.clearRect(
-					_clearBox.min.x | 0,
-					_clearBox.max.y | 0,
-					( _clearBox.max.x - _clearBox.min.x ) | 0,
-					( _clearBox.min.y - _clearBox.max.y ) | 0
-				);
+        setFillStyle('rgba(' + Math.floor(_clearColor.r * 255) + ',' + Math.floor(_clearColor.g * 255) + ',' + Math.floor(_clearColor.b * 255) + ',' +
+          _clearAlpha + ')');
 
-			}
+        _context.fillRect(
+          _clearBox.min.x | 0,
+          _clearBox.max.y | 0,
+          (_clearBox.max.x - _clearBox.min.x) | 0,
+          (_clearBox.min.y - _clearBox.max.y) | 0,
+        );
 
-			if ( _clearAlpha > 0 ) {
+      }
 
-				setBlending( THREE.NormalBlending );
-				setOpacity( 1 );
+      _clearBox.makeEmpty();
 
-				setFillStyle( 'rgba(' + Math.floor( _clearColor.r * 255 ) + ',' + Math.floor( _clearColor.g * 255 ) + ',' + Math.floor( _clearColor.b * 255 ) + ',' + _clearAlpha + ')' );
+    }
 
-				_context.fillRect(
-					_clearBox.min.x | 0,
-					_clearBox.max.y | 0,
-					( _clearBox.max.x - _clearBox.min.x ) | 0,
-					( _clearBox.min.y - _clearBox.max.y ) | 0
-				);
+  };
 
-			}
+  // compatibility
 
-			_clearBox.makeEmpty();
+  this.clearColor = function () {};
+  this.clearDepth = function () {};
+  this.clearStencil = function () {};
 
-		}
+  this.render = function (scene, camera) {
 
-	};
+    if (!(camera instanceof THREE.Camera)) {
 
-	// compatibility
+      console.error('THREE.CanvasRenderer.render: camera is not an instance of THREE.Camera.');
+      return;
 
-	this.clearColor = function () {};
-	this.clearDepth = function () {};
-	this.clearStencil = function () {};
+    }
 
-	this.render = function ( scene, camera ) {
+    let background = scene.background;
 
-		if ( camera instanceof THREE.Camera === false ) {
+    if (background && background.isColor) {
 
-			console.error( 'THREE.CanvasRenderer.render: camera is not an instance of THREE.Camera.' );
-			return;
+      setFillStyle('rgb(' + Math.floor(background.r * 255) + ',' + Math.floor(background.g * 255) + ',' + Math.floor(background.b * 255) + ')');
+      _context.fillRect(0, 0, _canvasWidth, _canvasHeight);
 
-		}
+    } else if (this.autoClear === true) {
 
-		var background = scene.background;
+      this.clear();
 
-		if ( background && background.isColor ) {
+    }
 
-			setFillStyle( 'rgb(' + Math.floor( background.r * 255 ) + ',' + Math.floor( background.g * 255 ) + ',' + Math.floor( background.b * 255 ) + ')' );
-			_context.fillRect( 0, 0, _canvasWidth, _canvasHeight );
+    _this.info.render.vertices = 0;
+    _this.info.render.faces = 0;
 
-		} else if ( this.autoClear === true ) {
+    _context.setTransform(_viewportWidth / _canvasWidth, 0, 0, -_viewportHeight / _canvasHeight, _viewportX, _canvasHeight - _viewportY);
+    _context.translate(_canvasWidthHalf, _canvasHeightHalf);
 
-			this.clear();
+    _renderData = _projector.projectScene(scene, camera, this.sortObjects, this.sortElements);
+    _elements = _renderData.elements;
+    _lights = _renderData.lights;
+    _camera = camera;
 
-		}
+    _normalViewMatrix.getNormalMatrix(camera.matrixWorldInverse);
 
-		_this.info.render.vertices = 0;
-		_this.info.render.faces = 0;
+    /* DEBUG
+    setFillStyle( 'rgba( 0, 255, 255, 0.5 )' );
+    _context.fillRect( _clipBox.min.x, _clipBox.min.y, _clipBox.max.x - _clipBox.min.x, _clipBox.max.y - _clipBox.min.y );
+    */
 
-		_context.setTransform( _viewportWidth / _canvasWidth, 0, 0, - _viewportHeight / _canvasHeight, _viewportX, _canvasHeight - _viewportY );
-		_context.translate( _canvasWidthHalf, _canvasHeightHalf );
+    calculateLights();
 
-		_renderData = _projector.projectScene( scene, camera, this.sortObjects, this.sortElements );
-		_elements = _renderData.elements;
-		_lights = _renderData.lights;
-		_camera = camera;
+    for (let e = 0, el = _elements.length; e < el; e++) {
 
-		_normalViewMatrix.getNormalMatrix( camera.matrixWorldInverse );
+      let element = _elements[e];
 
-		/* DEBUG
-		setFillStyle( 'rgba( 0, 255, 255, 0.5 )' );
-		_context.fillRect( _clipBox.min.x, _clipBox.min.y, _clipBox.max.x - _clipBox.min.x, _clipBox.max.y - _clipBox.min.y );
-		*/
+      let material = element.material;
 
-		calculateLights();
+      if (material === undefined || material.opacity === 0) continue;
 
-		for ( var e = 0, el = _elements.length; e < el; e ++ ) {
+      _elemBox.makeEmpty();
 
-			var element = _elements[ e ];
+      if (element instanceof THREE.RenderableSprite) {
 
-			var material = element.material;
+        _v1 = element;
+        _v1.x *= _canvasWidthHalf;
+        _v1.y *= _canvasHeightHalf;
 
-			if ( material === undefined || material.opacity === 0 ) continue;
+        renderSprite(_v1, element, material);
 
-			_elemBox.makeEmpty();
+      } else if (element instanceof THREE.RenderableLine) {
 
-			if ( element instanceof THREE.RenderableSprite ) {
+        _v1 = element.v1;
+        _v2 = element.v2;
 
-				_v1 = element;
-				_v1.x *= _canvasWidthHalf; _v1.y *= _canvasHeightHalf;
+        _v1.positionScreen.x *= _canvasWidthHalf;
+        _v1.positionScreen.y *= _canvasHeightHalf;
+        _v2.positionScreen.x *= _canvasWidthHalf;
+        _v2.positionScreen.y *= _canvasHeightHalf;
 
-				renderSprite( _v1, element, material );
+        _elemBox.setFromPoints([
+          _v1.positionScreen,
+          _v2.positionScreen,
+        ]);
 
-			} else if ( element instanceof THREE.RenderableLine ) {
+        if (_clipBox.intersectsBox(_elemBox) === true) {
 
-				_v1 = element.v1; _v2 = element.v2;
+          renderLine(_v1, _v2, element, material);
 
-				_v1.positionScreen.x *= _canvasWidthHalf; _v1.positionScreen.y *= _canvasHeightHalf;
-				_v2.positionScreen.x *= _canvasWidthHalf; _v2.positionScreen.y *= _canvasHeightHalf;
+        }
 
-				_elemBox.setFromPoints( [
-					_v1.positionScreen,
-					_v2.positionScreen
-				] );
+      } else if (element instanceof THREE.RenderableFace) {
 
-				if ( _clipBox.intersectsBox( _elemBox ) === true ) {
+        _v1 = element.v1;
+        _v2 = element.v2;
+        _v3 = element.v3;
 
-					renderLine( _v1, _v2, element, material );
+        if (_v1.positionScreen.z < -1 || _v1.positionScreen.z > 1) continue;
+        if (_v2.positionScreen.z < -1 || _v2.positionScreen.z > 1) continue;
+        if (_v3.positionScreen.z < -1 || _v3.positionScreen.z > 1) continue;
 
-				}
+        _v1.positionScreen.x *= _canvasWidthHalf;
+        _v1.positionScreen.y *= _canvasHeightHalf;
+        _v2.positionScreen.x *= _canvasWidthHalf;
+        _v2.positionScreen.y *= _canvasHeightHalf;
+        _v3.positionScreen.x *= _canvasWidthHalf;
+        _v3.positionScreen.y *= _canvasHeightHalf;
 
-			} else if ( element instanceof THREE.RenderableFace ) {
+        // if ( material.overdraw > 0 ) {
+        //
+        // 	expand( _v1.positionScreen, _v2.positionScreen, material.overdraw );
+        // 	expand( _v2.positionScreen, _v3.positionScreen, material.overdraw );
+        // 	expand( _v3.positionScreen, _v1.positionScreen, material.overdraw );
+        //
+        // }
 
-				_v1 = element.v1; _v2 = element.v2; _v3 = element.v3;
+        _elemBox.setFromPoints([
+          _v1.positionScreen,
+          _v2.positionScreen,
+          _v3.positionScreen,
+        ]);
 
-				if ( _v1.positionScreen.z < - 1 || _v1.positionScreen.z > 1 ) continue;
-				if ( _v2.positionScreen.z < - 1 || _v2.positionScreen.z > 1 ) continue;
-				if ( _v3.positionScreen.z < - 1 || _v3.positionScreen.z > 1 ) continue;
+        if (_clipBox.intersectsBox(_elemBox) === true) {
 
-				_v1.positionScreen.x *= _canvasWidthHalf; _v1.positionScreen.y *= _canvasHeightHalf;
-				_v2.positionScreen.x *= _canvasWidthHalf; _v2.positionScreen.y *= _canvasHeightHalf;
-				_v3.positionScreen.x *= _canvasWidthHalf; _v3.positionScreen.y *= _canvasHeightHalf;
+          renderFace3(_v1, _v2, _v3, 0, 1, 2, element, material);
 
-				if ( material.overdraw > 0 ) {
+        }
 
-					expand( _v1.positionScreen, _v2.positionScreen, material.overdraw );
-					expand( _v2.positionScreen, _v3.positionScreen, material.overdraw );
-					expand( _v3.positionScreen, _v1.positionScreen, material.overdraw );
+      }
 
-				}
+      /* DEBUG
+      setLineWidth( 1 );
+      setStrokeStyle( 'rgba( 0, 255, 0, 0.5 )' );
+      _context.strokeRect( _elemBox.min.x, _elemBox.min.y, _elemBox.max.x - _elemBox.min.x, _elemBox.max.y - _elemBox.min.y );
+      */
 
-				_elemBox.setFromPoints( [
-					_v1.positionScreen,
-					_v2.positionScreen,
-					_v3.positionScreen
-				] );
+      _clearBox.union(_elemBox);
 
-				if ( _clipBox.intersectsBox( _elemBox ) === true ) {
+    }
 
-					renderFace3( _v1, _v2, _v3, 0, 1, 2, element, material );
+    /* DEBUG
+    setLineWidth( 1 );
+    setStrokeStyle( 'rgba( 255, 0, 0, 0.5 )' );
+    _context.strokeRect( _clearBox.min.x, _clearBox.min.y, _clearBox.max.x - _clearBox.min.x, _clearBox.max.y - _clearBox.min.y );
+    */
 
-				}
+    _context.setTransform(1, 0, 0, 1, 0, 0);
 
-			}
+  };
 
-			/* DEBUG
-			setLineWidth( 1 );
-			setStrokeStyle( 'rgba( 0, 255, 0, 0.5 )' );
-			_context.strokeRect( _elemBox.min.x, _elemBox.min.y, _elemBox.max.x - _elemBox.min.x, _elemBox.max.y - _elemBox.min.y );
-			*/
+  //
 
-			_clearBox.union( _elemBox );
+  function calculateLights () {
 
-		}
+    _ambientLight.setRGB(0, 0, 0);
+    _directionalLights.setRGB(0, 0, 0);
+    _pointLights.setRGB(0, 0, 0);
 
-		/* DEBUG
-		setLineWidth( 1 );
-		setStrokeStyle( 'rgba( 255, 0, 0, 0.5 )' );
-		_context.strokeRect( _clearBox.min.x, _clearBox.min.y, _clearBox.max.x - _clearBox.min.x, _clearBox.max.y - _clearBox.min.y );
-		*/
+    for (let l = 0, ll = _lights.length; l < ll; l++) {
 
-		_context.setTransform( 1, 0, 0, 1, 0, 0 );
+      let light = _lights[l];
+      let lightColor = light.color;
 
-	};
+      if (light instanceof THREE.AmbientLight) {
 
-	//
+        _ambientLight.add(lightColor);
 
-	function calculateLights() {
+      } else if (light instanceof THREE.DirectionalLight) {
 
-		_ambientLight.setRGB( 0, 0, 0 );
-		_directionalLights.setRGB( 0, 0, 0 );
-		_pointLights.setRGB( 0, 0, 0 );
+        // for sprites
 
-		for ( var l = 0, ll = _lights.length; l < ll; l ++ ) {
+        _directionalLights.add(lightColor);
 
-			var light = _lights[ l ];
-			var lightColor = light.color;
+      } else if (light instanceof THREE.PointLight) {
 
-			if ( light instanceof THREE.AmbientLight ) {
+        // for sprites
 
-				_ambientLight.add( lightColor );
+        _pointLights.add(lightColor);
 
-			} else if ( light instanceof THREE.DirectionalLight ) {
+      }
 
-				// for sprites
+    }
 
-				_directionalLights.add( lightColor );
+  }
 
-			} else if ( light instanceof THREE.PointLight ) {
+  function calculateLight (position, normal, color) {
 
-				// for sprites
+    for (let l = 0, ll = _lights.length; l < ll; l++) {
 
-				_pointLights.add( lightColor );
+      let light = _lights[l];
 
-			}
+      _lightColor.copy(light.color);
 
-		}
+      if (light instanceof THREE.DirectionalLight) {
 
-	}
+        let lightPosition = _vector3.setFromMatrixPosition(light.matrixWorld).normalize();
 
-	function calculateLight( position, normal, color ) {
+        let amount = normal.dot(lightPosition);
 
-		for ( var l = 0, ll = _lights.length; l < ll; l ++ ) {
+        if (amount <= 0) continue;
 
-			var light = _lights[ l ];
+        amount *= light.intensity;
 
-			_lightColor.copy( light.color );
+        color.add(_lightColor.multiplyScalar(amount));
 
-			if ( light instanceof THREE.DirectionalLight ) {
+      } else if (light instanceof THREE.PointLight) {
 
-				var lightPosition = _vector3.setFromMatrixPosition( light.matrixWorld ).normalize();
+        let lightPosition = _vector3.setFromMatrixPosition(light.matrixWorld);
 
-				var amount = normal.dot( lightPosition );
+        let amount = normal.dot(_vector3.subVectors(lightPosition, position).normalize());
 
-				if ( amount <= 0 ) continue;
+        if (amount <= 0) continue;
 
-				amount *= light.intensity;
+        amount *= light.distance === 0 ? 1 : 1 - Math.min(position.distanceTo(lightPosition) / light.distance, 1);
 
-				color.add( _lightColor.multiplyScalar( amount ) );
+        if (amount === 0) continue;
 
-			} else if ( light instanceof THREE.PointLight ) {
+        amount *= light.intensity;
 
-				var lightPosition = _vector3.setFromMatrixPosition( light.matrixWorld );
+        color.add(_lightColor.multiplyScalar(amount));
 
-				var amount = normal.dot( _vector3.subVectors( lightPosition, position ).normalize() );
+      }
 
-				if ( amount <= 0 ) continue;
+    }
 
-				amount *= light.distance == 0 ? 1 : 1 - Math.min( position.distanceTo( lightPosition ) / light.distance, 1 );
+  }
 
-				if ( amount == 0 ) continue;
+  function renderSprite (v1, element, material) {
 
-				amount *= light.intensity;
+    setOpacity(material.opacity);
+    setBlending(material.blending);
 
-				color.add( _lightColor.multiplyScalar( amount ) );
+    let scaleX = element.scale.x * _canvasWidthHalf;
+    let scaleY = element.scale.y * _canvasHeightHalf;
 
-			}
+    let dist = 0.5 * Math.sqrt(scaleX * scaleX + scaleY * scaleY); // allow for rotated sprite
+    _elemBox.min.set(v1.x - dist, v1.y - dist);
+    _elemBox.max.set(v1.x + dist, v1.y + dist);
 
-		}
+    if (material instanceof THREE.SpriteMaterial) {
 
-	}
+      let texture = material.map;
 
-	function renderSprite( v1, element, material ) {
+      if (texture !== null) {
 
-		setOpacity( material.opacity );
-		setBlending( material.blending );
+        let pattern = _patterns[texture.id];
 
-		var scaleX = element.scale.x * _canvasWidthHalf;
-		var scaleY = element.scale.y * _canvasHeightHalf;
+        if (pattern === undefined || pattern.version !== texture.version) {
 
-		var dist = 0.5 * Math.sqrt( scaleX * scaleX + scaleY * scaleY ); // allow for rotated sprite
-		_elemBox.min.set( v1.x - dist, v1.y - dist );
-		_elemBox.max.set( v1.x + dist, v1.y + dist );
+          pattern = textureToPattern(texture);
+          _patterns[texture.id] = pattern;
 
-		if ( material instanceof THREE.SpriteMaterial ) {
+        }
 
-			var texture = material.map;
+        if (pattern.canvas !== undefined) {
 
-			if ( texture !== null ) {
+          setFillStyle(pattern.canvas);
 
-				var pattern = _patterns[ texture.id ];
+          let bitmap = texture.image;
 
-				if ( pattern === undefined || pattern.version !== texture.version ) {
+          let ox = bitmap.width * texture.offset.x;
+          let oy = bitmap.height * texture.offset.y;
 
-					pattern = textureToPattern( texture );
-					_patterns[ texture.id ] = pattern;
+          let sx = bitmap.width * texture.repeat.x;
+          let sy = bitmap.height * texture.repeat.y;
 
-				}
+          let cx = scaleX / sx;
+          let cy = scaleY / sy;
 
-				if ( pattern.canvas !== undefined ) {
+          _context.save();
+          _context.translate(v1.x, v1.y);
+          if (material.rotation !== 0) _context.rotate(material.rotation);
+          _context.translate(-scaleX / 2, -scaleY / 2);
+          _context.scale(cx, cy);
+          _context.translate(-ox, -oy);
+          _context.fillRect(ox, oy, sx, sy);
+          _context.restore();
 
-					setFillStyle( pattern.canvas );
+        }
 
-					var bitmap = texture.image;
+      } else {
 
-					var ox = bitmap.width * texture.offset.x;
-					var oy = bitmap.height * texture.offset.y;
+        // no texture
 
-					var sx = bitmap.width * texture.repeat.x;
-					var sy = bitmap.height * texture.repeat.y;
+        setFillStyle(material.color.getStyle());
 
-					var cx = scaleX / sx;
-					var cy = scaleY / sy;
+        _context.save();
+        _context.translate(v1.x, v1.y);
+        if (material.rotation !== 0) _context.rotate(material.rotation);
+        _context.scale(scaleX, -scaleY);
+        _context.fillRect(-0.5, -0.5, 1, 1);
+        _context.restore();
 
-					_context.save();
-					_context.translate( v1.x, v1.y );
-					if ( material.rotation !== 0 ) _context.rotate( material.rotation );
-					_context.translate( - scaleX / 2, - scaleY / 2 );
-					_context.scale( cx, cy );
-					_context.translate( - ox, - oy );
-					_context.fillRect( ox, oy, sx, sy );
-					_context.restore();
+      }
 
-				}
+    } else if (material instanceof THREE.SpriteCanvasMaterial) {
 
-			} else {
+      setStrokeStyle(material.color.getStyle());
+      setFillStyle(material.color.getStyle());
 
-				// no texture
+      _context.save();
+      _context.translate(v1.x, v1.y);
+      if (material.rotation !== 0) _context.rotate(material.rotation);
+      _context.scale(scaleX, scaleY);
 
-				setFillStyle( material.color.getStyle() );
+      material.program();
 
-				_context.save();
-				_context.translate( v1.x, v1.y );
-				if ( material.rotation !== 0 ) _context.rotate( material.rotation );
-				_context.scale( scaleX, - scaleY );
-				_context.fillRect( - 0.5, - 0.5, 1, 1 );
-				_context.restore();
+      _context.restore();
 
-			}
+    }
 
-		} else if ( material instanceof THREE.SpriteCanvasMaterial ) {
+    /* DEBUG
+    setStrokeStyle( 'rgb(255,255,0)' );
+    _context.beginPath();
+    _context.moveTo( v1.x - 10, v1.y );
+    _context.lineTo( v1.x + 10, v1.y );
+    _context.moveTo( v1.x, v1.y - 10 );
+    _context.lineTo( v1.x, v1.y + 10 );
+    _context.stroke();
+    */
 
-			setStrokeStyle( material.color.getStyle() );
-			setFillStyle( material.color.getStyle() );
+  }
 
-			_context.save();
-			_context.translate( v1.x, v1.y );
-			if ( material.rotation !== 0 ) _context.rotate( material.rotation );
-			_context.scale( scaleX, scaleY );
+  function renderLine (v1, v2, element, material) {
 
-			material.program( _context );
+    setOpacity(material.opacity);
+    setBlending(material.blending);
 
-			_context.restore();
+    _context.beginPath();
+    _context.moveTo(v1.positionScreen.x, v1.positionScreen.y);
+    _context.lineTo(v2.positionScreen.x, v2.positionScreen.y);
 
-		}
+    if (material instanceof THREE.LineBasicMaterial) {
 
-		/* DEBUG
-		setStrokeStyle( 'rgb(255,255,0)' );
-		_context.beginPath();
-		_context.moveTo( v1.x - 10, v1.y );
-		_context.lineTo( v1.x + 10, v1.y );
-		_context.moveTo( v1.x, v1.y - 10 );
-		_context.lineTo( v1.x, v1.y + 10 );
-		_context.stroke();
-		*/
+      setLineWidth(material.linewidth);
+      setLineCap(material.linecap);
+      setLineJoin(material.linejoin);
 
-	}
+      if (material.vertexColors !== THREE.VertexColors) {
 
-	function renderLine( v1, v2, element, material ) {
+        setStrokeStyle(material.color.getStyle());
 
-		setOpacity( material.opacity );
-		setBlending( material.blending );
+      } else {
 
-		_context.beginPath();
-		_context.moveTo( v1.positionScreen.x, v1.positionScreen.y );
-		_context.lineTo( v2.positionScreen.x, v2.positionScreen.y );
+        let colorStyle1 = element.vertexColors[0].getStyle();
+        let colorStyle2 = element.vertexColors[1].getStyle();
 
-		if ( material instanceof THREE.LineBasicMaterial ) {
+        if (colorStyle1 === colorStyle2) {
 
-			setLineWidth( material.linewidth );
-			setLineCap( material.linecap );
-			setLineJoin( material.linejoin );
+          setStrokeStyle(colorStyle1);
 
-			if ( material.vertexColors !== THREE.VertexColors ) {
+        } else {
 
-				setStrokeStyle( material.color.getStyle() );
+          try {
 
-			} else {
+            let grad = _context.createLinearGradient(
+              v1.positionScreen.x,
+              v1.positionScreen.y,
+              v2.positionScreen.x,
+              v2.positionScreen.y,
+            );
+            grad.addColorStop(0, colorStyle1);
+            grad.addColorStop(1, colorStyle2);
 
-				var colorStyle1 = element.vertexColors[ 0 ].getStyle();
-				var colorStyle2 = element.vertexColors[ 1 ].getStyle();
+          } catch (exception) {
 
-				if ( colorStyle1 === colorStyle2 ) {
+            grad = colorStyle1;
 
-					setStrokeStyle( colorStyle1 );
+          }
 
-				} else {
+          setStrokeStyle(grad);
 
-					try {
+        }
 
-						var grad = _context.createLinearGradient(
-							v1.positionScreen.x,
-							v1.positionScreen.y,
-							v2.positionScreen.x,
-							v2.positionScreen.y
-						);
-						grad.addColorStop( 0, colorStyle1 );
-						grad.addColorStop( 1, colorStyle2 );
+      }
 
-					} catch ( exception ) {
+      _context.stroke();
+      _elemBox.expandByScalar(material.linewidth * 2);
 
-						grad = colorStyle1;
+    } else if (material instanceof THREE.LineDashedMaterial) {
 
-					}
+      setLineWidth(material.linewidth);
+      setLineCap(material.linecap);
+      setLineJoin(material.linejoin);
+      setStrokeStyle(material.color.getStyle());
+      setLineDash([material.dashSize, material.gapSize]);
 
-					setStrokeStyle( grad );
+      _context.stroke();
 
-				}
+      _elemBox.expandByScalar(material.linewidth * 2);
 
-			}
+      setLineDash([]);
 
-			_context.stroke();
-			_elemBox.expandByScalar( material.linewidth * 2 );
+    }
 
-		} else if ( material instanceof THREE.LineDashedMaterial ) {
+  }
 
-			setLineWidth( material.linewidth );
-			setLineCap( material.linecap );
-			setLineJoin( material.linejoin );
-			setStrokeStyle( material.color.getStyle() );
-			setLineDash( [ material.dashSize, material.gapSize ] );
+  function renderFace3 (v1, v2, v3, uv1, uv2, uv3, element, material) {
 
-			_context.stroke();
+    _this.info.render.vertices += 3;
+    _this.info.render.faces++;
 
-			_elemBox.expandByScalar( material.linewidth * 2 );
+    setOpacity(material.opacity);
+    setBlending(material.blending);
 
-			setLineDash( [] );
+    _v1x = v1.positionScreen.x;
+    _v1y = v1.positionScreen.y;
+    _v2x = v2.positionScreen.x;
+    _v2y = v2.positionScreen.y;
+    _v3x = v3.positionScreen.x;
+    _v3y = v3.positionScreen.y;
 
-		}
+    drawTriangle(_v1x, _v1y, _v2x, _v2y, _v3x, _v3y);
 
-	}
+    if ((material instanceof THREE.MeshLambertMaterial || material instanceof THREE.MeshPhongMaterial) && material.map === null) {
 
-	function renderFace3( v1, v2, v3, uv1, uv2, uv3, element, material ) {
+      _diffuseColor.copy(material.color);
+      _emissiveColor.copy(material.emissive);
 
-		_this.info.render.vertices += 3;
-		_this.info.render.faces ++;
+      if (material.vertexColors === THREE.FaceColors) {
 
-		setOpacity( material.opacity );
-		setBlending( material.blending );
+        _diffuseColor.multiply(element.color);
 
-		_v1x = v1.positionScreen.x; _v1y = v1.positionScreen.y;
-		_v2x = v2.positionScreen.x; _v2y = v2.positionScreen.y;
-		_v3x = v3.positionScreen.x; _v3y = v3.positionScreen.y;
+      }
 
-		drawTriangle( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y );
+      _color.copy(_ambientLight);
 
-		if ( ( material instanceof THREE.MeshLambertMaterial || material instanceof THREE.MeshPhongMaterial ) && material.map === null ) {
+      _centroid.copy(v1.positionWorld).add(v2.positionWorld).add(v3.positionWorld).divideScalar(3);
 
-			_diffuseColor.copy( material.color );
-			_emissiveColor.copy( material.emissive );
+      calculateLight(_centroid, element.normalModel, _color);
 
-			if ( material.vertexColors === THREE.FaceColors ) {
+      _color.multiply(_diffuseColor).add(_emissiveColor);
 
-				_diffuseColor.multiply( element.color );
+      material.wireframe === true
+        ? strokePath(_color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin)
+        : fillPath(_color);
 
-			}
+    } else if (material instanceof THREE.MeshBasicMaterial ||
+      material instanceof THREE.MeshLambertMaterial ||
+      material instanceof THREE.MeshPhongMaterial) {
 
-			_color.copy( _ambientLight );
+      if (material.map !== null) {
 
-			_centroid.copy( v1.positionWorld ).add( v2.positionWorld ).add( v3.positionWorld ).divideScalar( 3 );
+        let mapping = material.map.mapping;
 
-			calculateLight( _centroid, element.normalModel, _color );
+        if (mapping === THREE.UVMapping) {
 
-			_color.multiply( _diffuseColor ).add( _emissiveColor );
+          _uvs = element.uvs;
+          patternPath(_v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _uvs[uv1].x, _uvs[uv1].y, _uvs[uv2].x, _uvs[uv2].y, _uvs[uv3].x, _uvs[uv3].y, material.map);
 
-			material.wireframe === true
-				 ? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-				 : fillPath( _color );
+        }
 
-		} else if ( material instanceof THREE.MeshBasicMaterial ||
-				    material instanceof THREE.MeshLambertMaterial ||
-				    material instanceof THREE.MeshPhongMaterial ) {
+      } else if (material.envMap !== null) {
 
-			if ( material.map !== null ) {
+        if (material.envMap.mapping === THREE.SphericalReflectionMapping) {
 
-				var mapping = material.map.mapping;
+          _normal.copy(element.vertexNormalsModel[uv1]).applyMatrix3(_normalViewMatrix);
+          _uv1x = 0.5 * _normal.x + 0.5;
+          _uv1y = 0.5 * _normal.y + 0.5;
 
-				if ( mapping === THREE.UVMapping ) {
+          _normal.copy(element.vertexNormalsModel[uv2]).applyMatrix3(_normalViewMatrix);
+          _uv2x = 0.5 * _normal.x + 0.5;
+          _uv2y = 0.5 * _normal.y + 0.5;
 
-					_uvs = element.uvs;
-					patternPath( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _uvs[ uv1 ].x, _uvs[ uv1 ].y, _uvs[ uv2 ].x, _uvs[ uv2 ].y, _uvs[ uv3 ].x, _uvs[ uv3 ].y, material.map );
+          _normal.copy(element.vertexNormalsModel[uv3]).applyMatrix3(_normalViewMatrix);
+          _uv3x = 0.5 * _normal.x + 0.5;
+          _uv3y = 0.5 * _normal.y + 0.5;
 
-				}
+          patternPath(_v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _uv1x, _uv1y, _uv2x, _uv2y, _uv3x, _uv3y, material.envMap);
 
-			} else if ( material.envMap !== null ) {
+        }
 
-				if ( material.envMap.mapping === THREE.SphericalReflectionMapping ) {
+      } else {
 
-					_normal.copy( element.vertexNormalsModel[ uv1 ] ).applyMatrix3( _normalViewMatrix );
-					_uv1x = 0.5 * _normal.x + 0.5;
-					_uv1y = 0.5 * _normal.y + 0.5;
+        _color.copy(material.color);
 
-					_normal.copy( element.vertexNormalsModel[ uv2 ] ).applyMatrix3( _normalViewMatrix );
-					_uv2x = 0.5 * _normal.x + 0.5;
-					_uv2y = 0.5 * _normal.y + 0.5;
+        if (material.vertexColors === THREE.FaceColors) {
 
-					_normal.copy( element.vertexNormalsModel[ uv3 ] ).applyMatrix3( _normalViewMatrix );
-					_uv3x = 0.5 * _normal.x + 0.5;
-					_uv3y = 0.5 * _normal.y + 0.5;
+          _color.multiply(element.color);
 
-					patternPath( _v1x, _v1y, _v2x, _v2y, _v3x, _v3y, _uv1x, _uv1y, _uv2x, _uv2y, _uv3x, _uv3y, material.envMap );
+        }
 
-				}
+        material.wireframe === true
+          ? strokePath(_color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin)
+          : fillPath(_color);
 
-			} else {
+      }
 
-				_color.copy( material.color );
+    } else if (material instanceof THREE.MeshNormalMaterial) {
 
-				if ( material.vertexColors === THREE.FaceColors ) {
+      _normal.copy(element.normalModel).applyMatrix3(_normalViewMatrix);
 
-					_color.multiply( element.color );
+      // _color.setRGB( _normal.x, _normal.y, _normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
+      _color.setRGB(_normal.y, _normal.y, _normal.y).multiplyScalar(0.08).addScalar(0.92);
 
-				}
+      material.wireframe === true
+        ? strokePath(_color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin)
+        : fillPath(_color);
 
-				material.wireframe === true
-					 ? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-					 : fillPath( _color );
+    } else {
 
-			}
+      _color.setRGB(1, 1, 1);
 
-		} else if ( material instanceof THREE.MeshNormalMaterial ) {
+      material.wireframe === true
+        ? strokePath(_color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin)
+        : fillPath(_color);
 
-			_normal.copy( element.normalModel ).applyMatrix3( _normalViewMatrix );
+    }
 
-			// _color.setRGB( _normal.x, _normal.y, _normal.z ).multiplyScalar( 0.5 ).addScalar( 0.5 );
-			_color.setRGB( _normal.y, _normal.y, _normal.y ).multiplyScalar( 0.08 ).addScalar( 0.92 );
+  }
 
-			material.wireframe === true
-				 ? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-				 : fillPath( _color );
+  //
 
-		} else {
+  function drawTriangle (x0, y0, x1, y1, x2, y2) {
 
-			_color.setRGB( 1, 1, 1 );
+    _context.beginPath();
+    _context.moveTo(x0, y0);
+    _context.lineTo(x1, y1);
+    _context.lineTo(x2, y2);
+    _context.closePath();
 
-			material.wireframe === true
-				 ? strokePath( _color, material.wireframeLinewidth, material.wireframeLinecap, material.wireframeLinejoin )
-				 : fillPath( _color );
+  }
 
-		}
+  function strokePath (color, linewidth, linecap, linejoin) {
 
-	}
+    setLineWidth(linewidth);
+    setLineCap(linecap);
+    setLineJoin(linejoin);
+    setStrokeStyle(color.getStyle());
 
-	//
+    _context.stroke();
 
-	function drawTriangle( x0, y0, x1, y1, x2, y2 ) {
+    _elemBox.expandByScalar(linewidth * 2);
 
-		_context.beginPath();
-		_context.moveTo( x0, y0 );
-		_context.lineTo( x1, y1 );
-		_context.lineTo( x2, y2 );
-		_context.closePath();
+  }
 
-	}
+  function fillPath (color) {
 
-	function strokePath( color, linewidth, linecap, linejoin ) {
+    setFillStyle(color.getStyle());
+    _context.fill();
 
-		setLineWidth( linewidth );
-		setLineCap( linecap );
-		setLineJoin( linejoin );
-		setStrokeStyle( color.getStyle() );
+  }
 
-		_context.stroke();
+  function textureToPattern (texture) {
 
-		_elemBox.expandByScalar( linewidth * 2 );
+    if (texture.version === 0 ||
+      texture instanceof THREE.CompressedTexture ||
+      texture instanceof THREE.DataTexture) {
 
-	}
+      return {
+        canvas: undefined,
+        version: texture.version,
+      };
 
-	function fillPath( color ) {
+    }
 
-		setFillStyle( color.getStyle() );
-		_context.fill();
+    let image = texture.image;
 
-	}
+    if (image.complete === false) {
 
-	function textureToPattern( texture ) {
+      return {
+        canvas: undefined,
+        version: 0,
+      };
 
-		if ( texture.version === 0 ||
-			texture instanceof THREE.CompressedTexture ||
-			texture instanceof THREE.DataTexture ) {
+    }
 
-			return {
-				canvas: undefined,
-				version: texture.version
-			};
+    let repeatX = texture.wrapS === THREE.RepeatWrapping || texture.wrapS === THREE.MirroredRepeatWrapping;
+    let repeatY = texture.wrapT === THREE.RepeatWrapping || texture.wrapT === THREE.MirroredRepeatWrapping;
 
-		}
+    let mirrorX = texture.wrapS === THREE.MirroredRepeatWrapping;
+    let mirrorY = texture.wrapT === THREE.MirroredRepeatWrapping;
 
-		var image = texture.image;
+    //
 
-		if ( image.complete === false ) {
+    let canvas = document.createElement('canvas');
+    canvas.width = image.width * (mirrorX ? 2 : 1);
+    canvas.height = image.height * (mirrorY ? 2 : 1);
 
-			return {
-				canvas: undefined,
-				version: 0
-			};
+    let context = canvas.getContext('2d');
+    context.setTransform(1, 0, 0, -1, 0, image.height);
+    context.drawImage(image, 0, 0);
 
-		}
+    if (mirrorX === true) {
 
-		var repeatX = texture.wrapS === THREE.RepeatWrapping || texture.wrapS === THREE.MirroredRepeatWrapping;
-		var repeatY = texture.wrapT === THREE.RepeatWrapping || texture.wrapT === THREE.MirroredRepeatWrapping;
+      context.setTransform(-1, 0, 0, -1, image.width, image.height);
+      context.drawImage(image, -image.width, 0);
 
-		var mirrorX = texture.wrapS === THREE.MirroredRepeatWrapping;
-		var mirrorY = texture.wrapT === THREE.MirroredRepeatWrapping;
+    }
 
-		//
+    if (mirrorY === true) {
 
-		var canvas = document.createElement( 'canvas' );
-		canvas.width = image.width * ( mirrorX ? 2 : 1 );
-		canvas.height = image.height * ( mirrorY ? 2 : 1 );
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.drawImage(image, 0, image.height);
 
-		var context = canvas.getContext( '2d' );
-		context.setTransform( 1, 0, 0, - 1, 0, image.height );
-		context.drawImage( image, 0, 0 );
+    }
 
-		if ( mirrorX === true ) {
+    if (mirrorX === true && mirrorY === true) {
 
-			context.setTransform( - 1, 0, 0, - 1, image.width, image.height );
-			context.drawImage( image, - image.width, 0 );
+      context.setTransform(-1, 0, 0, 1, image.width, 0);
+      context.drawImage(image, -image.width, image.height);
 
-		}
+    }
 
-		if ( mirrorY === true ) {
+    let repeat = 'no-repeat';
 
-			context.setTransform( 1, 0, 0, 1, 0, 0 );
-			context.drawImage( image, 0, image.height );
+    if (repeatX === true && repeatY === true) {
 
-		}
+      repeat = 'repeat';
 
-		if ( mirrorX === true && mirrorY === true ) {
+    } else if (repeatX === true) {
 
-			context.setTransform( - 1, 0, 0, 1, image.width, 0 );
-			context.drawImage( image, - image.width, image.height );
+      repeat = 'repeat-x';
 
-		}
+    } else if (repeatY === true) {
 
-		var repeat = 'no-repeat';
+      repeat = 'repeat-y';
 
-		if ( repeatX === true && repeatY === true ) {
+    }
 
-			repeat = 'repeat';
+    let pattern = _context.createPattern(canvas, repeat);
 
-		} else if ( repeatX === true ) {
+    if (texture.onUpdate) texture.onUpdate(texture);
 
-			repeat = 'repeat-x';
+    return {
+      canvas: pattern,
+      version: texture.version,
+    };
 
-		} else if ( repeatY === true ) {
+  }
 
-			repeat = 'repeat-y';
+  function patternPath (x0, y0, x1, y1, x2, y2, u0, v0, u1, v1, u2, v2, texture) {
 
-		}
+    let pattern = _patterns[texture.id];
 
-		var pattern = _context.createPattern( canvas, repeat );
+    if (pattern === undefined || pattern.version !== texture.version) {
 
-		if ( texture.onUpdate ) texture.onUpdate( texture );
+      pattern = textureToPattern(texture);
+      _patterns[texture.id] = pattern;
 
-		return {
-			canvas: pattern,
-			version: texture.version
-		};
+    }
 
-	}
+    if (pattern.canvas !== undefined) {
 
-	function patternPath( x0, y0, x1, y1, x2, y2, u0, v0, u1, v1, u2, v2, texture ) {
+      setFillStyle(pattern.canvas);
 
-		var pattern = _patterns[ texture.id ];
+    } else {
 
-		if ( pattern === undefined || pattern.version !== texture.version ) {
+      setFillStyle('rgba( 0, 0, 0, 1)');
+      _context.fill();
+      return;
 
-			pattern = textureToPattern( texture );
-			_patterns[ texture.id ] = pattern;
+    }
 
-		}
+    // http://extremelysatisfactorytotalitarianism.com/blog/?p=2120
 
-		if ( pattern.canvas !== undefined ) {
+    let a, b, c, d, e, f, det, idet,
+      offsetX = texture.offset.x / texture.repeat.x,
+      offsetY = texture.offset.y / texture.repeat.y,
+      width = texture.image.width * texture.repeat.x,
+      height = texture.image.height * texture.repeat.y;
 
-			setFillStyle( pattern.canvas );
+    u0 = (u0 + offsetX) * width;
+    v0 = (v0 + offsetY) * height;
 
-		} else {
+    u1 = (u1 + offsetX) * width;
+    v1 = (v1 + offsetY) * height;
 
-			setFillStyle( 'rgba( 0, 0, 0, 1)' );
-			_context.fill();
-			return;
+    u2 = (u2 + offsetX) * width;
+    v2 = (v2 + offsetY) * height;
 
-		}
+    x1 -= x0;
+    y1 -= y0;
+    x2 -= x0;
+    y2 -= y0;
 
-		// http://extremelysatisfactorytotalitarianism.com/blog/?p=2120
+    u1 -= u0;
+    v1 -= v0;
+    u2 -= u0;
+    v2 -= v0;
 
-		var a, b, c, d, e, f, det, idet,
-		offsetX = texture.offset.x / texture.repeat.x,
-		offsetY = texture.offset.y / texture.repeat.y,
-		width = texture.image.width * texture.repeat.x,
-		height = texture.image.height * texture.repeat.y;
+    det = u1 * v2 - u2 * v1;
 
-		u0 = ( u0 + offsetX ) * width;
-		v0 = ( v0 + offsetY ) * height;
+    if (det === 0) return;
 
-		u1 = ( u1 + offsetX ) * width;
-		v1 = ( v1 + offsetY ) * height;
+    idet = 1 / det;
 
-		u2 = ( u2 + offsetX ) * width;
-		v2 = ( v2 + offsetY ) * height;
+    a = (v2 * x1 - v1 * x2) * idet;
+    b = (v2 * y1 - v1 * y2) * idet;
+    c = (u1 * x2 - u2 * x1) * idet;
+    d = (u1 * y2 - u2 * y1) * idet;
 
-		x1 -= x0; y1 -= y0;
-		x2 -= x0; y2 -= y0;
+    e = x0 - a * u0 - c * v0;
+    f = y0 - b * u0 - d * v0;
 
-		u1 -= u0; v1 -= v0;
-		u2 -= u0; v2 -= v0;
+    _context.save();
+    _context.transform(a, b, c, d, e, f);
+    _context.fill();
+    _context.restore();
 
-		det = u1 * v2 - u2 * v1;
+  }
 
-		if ( det === 0 ) return;
+  // Hide anti-alias gaps
 
-		idet = 1 / det;
+  // Context cached methods.
 
-		a = ( v2 * x1 - v1 * x2 ) * idet;
-		b = ( v2 * y1 - v1 * y2 ) * idet;
-		c = ( u1 * x2 - u2 * x1 ) * idet;
-		d = ( u1 * y2 - u2 * y1 ) * idet;
+  function setOpacity (value) {
 
-		e = x0 - a * u0 - c * v0;
-		f = y0 - b * u0 - d * v0;
+    if (_contextGlobalAlpha !== value) {
 
-		_context.save();
-		_context.transform( a, b, c, d, e, f );
-		_context.fill();
-		_context.restore();
+      _context.globalAlpha = value;
+      _contextGlobalAlpha = value;
 
-	}
+    }
 
-	function clipImage( x0, y0, x1, y1, x2, y2, u0, v0, u1, v1, u2, v2, image ) {
+  }
 
-		// http://extremelysatisfactorytotalitarianism.com/blog/?p=2120
+  function setBlending (value) {
 
-		var a, b, c, d, e, f, det, idet,
-		width = image.width - 1,
-		height = image.height - 1;
+    if (_contextGlobalCompositeOperation !== value) {
 
-		u0 *= width; v0 *= height;
-		u1 *= width; v1 *= height;
-		u2 *= width; v2 *= height;
+      if (value === THREE.NormalBlending) {
 
-		x1 -= x0; y1 -= y0;
-		x2 -= x0; y2 -= y0;
+        _context.globalCompositeOperation = 'source-over';
 
-		u1 -= u0; v1 -= v0;
-		u2 -= u0; v2 -= v0;
+      } else if (value === THREE.AdditiveBlending) {
 
-		det = u1 * v2 - u2 * v1;
+        _context.globalCompositeOperation = 'lighter';
 
-		idet = 1 / det;
+      } else if (value === THREE.SubtractiveBlending) {
 
-		a = ( v2 * x1 - v1 * x2 ) * idet;
-		b = ( v2 * y1 - v1 * y2 ) * idet;
-		c = ( u1 * x2 - u2 * x1 ) * idet;
-		d = ( u1 * y2 - u2 * y1 ) * idet;
+        _context.globalCompositeOperation = 'darker';
 
-		e = x0 - a * u0 - c * v0;
-		f = y0 - b * u0 - d * v0;
+      } else if (value === THREE.MultiplyBlending) {
 
-		_context.save();
-		_context.transform( a, b, c, d, e, f );
-		_context.clip();
-		_context.drawImage( image, 0, 0 );
-		_context.restore();
+        _context.globalCompositeOperation = 'multiply';
 
-	}
+      }
 
-	// Hide anti-alias gaps
+      _contextGlobalCompositeOperation = value;
 
-	function expand( v1, v2, pixels ) {
+    }
 
-		var x = v2.x - v1.x, y = v2.y - v1.y,
-		det = x * x + y * y, idet;
+  }
 
-		if ( det === 0 ) return;
+  function setLineWidth (value) {
 
-		idet = pixels / Math.sqrt( det );
+    if (_contextLineWidth !== value) {
 
-		x *= idet; y *= idet;
+      _context.lineWidth = value;
+      _contextLineWidth = value;
 
-		v2.x += x; v2.y += y;
-		v1.x -= x; v1.y -= y;
+    }
 
-	}
+  }
 
-	// Context cached methods.
+  function setLineCap (value) {
 
-	function setOpacity( value ) {
+    // "butt", "round", "square"
 
-		if ( _contextGlobalAlpha !== value ) {
+    if (_contextLineCap !== value) {
 
-			_context.globalAlpha = value;
-			_contextGlobalAlpha = value;
+      _context.lineCap = value;
+      _contextLineCap = value;
 
-		}
+    }
 
-	}
+  }
 
-	function setBlending( value ) {
+  function setLineJoin (value) {
 
-		if ( _contextGlobalCompositeOperation !== value ) {
+    // "round", "bevel", "miter"
 
-			if ( value === THREE.NormalBlending ) {
+    if (_contextLineJoin !== value) {
 
-				_context.globalCompositeOperation = 'source-over';
+      _context.lineJoin = value;
+      _contextLineJoin = value;
 
-			} else if ( value === THREE.AdditiveBlending ) {
+    }
 
-				_context.globalCompositeOperation = 'lighter';
+  }
 
-			} else if ( value === THREE.SubtractiveBlending ) {
+  function setStrokeStyle (value) {
 
-				_context.globalCompositeOperation = 'darker';
+    if (_contextStrokeStyle !== value) {
 
-			} else if ( value === THREE.MultiplyBlending ) {
+      _context.strokeStyle = value;
+      _contextStrokeStyle = value;
 
-				_context.globalCompositeOperation = 'multiply';
+    }
 
-			}
+  }
 
-			_contextGlobalCompositeOperation = value;
+  function setFillStyle (value) {
 
-		}
+    if (_contextFillStyle !== value) {
 
-	}
+      _context.fillStyle = value;
+      _contextFillStyle = value;
 
-	function setLineWidth( value ) {
+    }
 
-		if ( _contextLineWidth !== value ) {
+  }
 
-			_context.lineWidth = value;
-			_contextLineWidth = value;
+  function setLineDash (value) {
 
-		}
+    if (_contextLineDash.length !== value.length) {
 
-	}
+      _context.setLineDash(value);
+      _contextLineDash = value;
 
-	function setLineCap( value ) {
+    }
 
-		// "butt", "round", "square"
-
-		if ( _contextLineCap !== value ) {
-
-			_context.lineCap = value;
-			_contextLineCap = value;
-
-		}
-
-	}
-
-	function setLineJoin( value ) {
-
-		// "round", "bevel", "miter"
-
-		if ( _contextLineJoin !== value ) {
-
-			_context.lineJoin = value;
-			_contextLineJoin = value;
-
-		}
-
-	}
-
-	function setStrokeStyle( value ) {
-
-		if ( _contextStrokeStyle !== value ) {
-
-			_context.strokeStyle = value;
-			_contextStrokeStyle = value;
-
-		}
-
-	}
-
-	function setFillStyle( value ) {
-
-		if ( _contextFillStyle !== value ) {
-
-			_context.fillStyle = value;
-			_contextFillStyle = value;
-
-		}
-
-	}
-
-	function setLineDash( value ) {
-
-		if ( _contextLineDash.length !== value.length ) {
-
-			_context.setLineDash( value );
-			_contextLineDash = value;
-
-		}
-
-	}
+  }
 
 };

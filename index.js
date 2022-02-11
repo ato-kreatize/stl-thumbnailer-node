@@ -161,7 +161,6 @@ StlThumbnailer.prototype.processThumbnail = function (thumbnailSpec) {
       camera.updateProjectionMatrix();
 
       // Get materials according to requested characteristics of the output render
-      // TODO: Blending Modes?
       if (thumbnailSpec.metallicOpacity > 0) scene.add(that.getMetallicMesh(geometry, thumbnailSpec.metallicOpacity));
       if (thumbnailSpec.baseOpacity > 0) scene.add(that.getBasicMesh(geometry, thumbnailSpec.baseOpacity, thumbnailSpec.baseColor));
       if (thumbnailSpec.shadeNormalsOpacity > 0) scene.add(that.getNormalMesh(geometry, thumbnailSpec.shadeNormalsOpacity));
@@ -180,7 +179,7 @@ StlThumbnailer.prototype.getMetallicMesh = function (geometry, opacity) {
   envMap.mapping = THREE.SphericalReflectionMapping;
   const mat = new THREE.MeshLambertMaterial({
     envMap: envMap,
-    overdraw: 0.5,
+    // overdraw: 0.5,
     transparent: true,
     side: THREE.DoubleSide,
     opacity: opacity,
@@ -190,7 +189,7 @@ StlThumbnailer.prototype.getMetallicMesh = function (geometry, opacity) {
 
 StlThumbnailer.prototype.getBasicMesh = function (geometry, opacity, color) {
   const material = new THREE.MeshBasicMaterial({
-    overdraw: 0.1,
+    // overdraw: 0.1,
     side: THREE.DoubleSide,
     transparent: true,
     opacity: opacity,
@@ -201,7 +200,7 @@ StlThumbnailer.prototype.getBasicMesh = function (geometry, opacity, color) {
 
 StlThumbnailer.prototype.getNormalMesh = function (geometry, opacity) {
   const material = new THREE.MeshNormalMaterial({
-    overdraw: 0.2,
+    // overdraw: 0.2,
     side: THREE.DoubleSide,
     transparent: true,
     opacity: opacity,
