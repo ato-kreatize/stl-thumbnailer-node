@@ -1,6 +1,6 @@
 {
   "name": "stl-thumbnailer-node",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Create thumbnails for 3D STL files.",
   "main": "index.js",
   "scripts": {
